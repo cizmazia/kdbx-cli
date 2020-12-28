@@ -1,0 +1,2 @@
+#!/bin/sh -
+ln -sf /dev/stderr /tmp/stderr && ln -sf /dev/stderr /tmp/stderr.pub && yes | ssh-keygen -oq -N '' -C '-' -t ed25519 -f /tmp/stderr 2>&1 > /dev/null

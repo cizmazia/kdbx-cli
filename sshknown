@@ -1,0 +1,4 @@
+#!/bin/sh -
+cat - >> ~/.ssh/known_hosts
+ssh-keygen -H
+rm -v ~/.ssh/known_hosts.old
