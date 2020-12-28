@@ -655,7 +655,6 @@ if __name__ == '__main__':
     args.add_argument('--clip-seconds',  type=int)
     args.add_argument('--paste')
     args.add_argument('--ssh-add')
-    args.add_argument('--ssh-long-add')
     args.add_argument('--ssh-gen')
     args.add_argument('--ssh-known')
     args.add_argument('db')
