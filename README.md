@@ -11,8 +11,8 @@
 - Auto-erase clipboard (after `10` seconds by default)
 - Auto-completion using the `tab` key
 - No destructive operations 
- - Every change is saved to entry history
- - Deleted entries are moved to `Recycle Bin`
+  - Every change is saved to entry history
+  - Deleted entries are moved to `Recycle Bin`
 - Prevent overwriting the database file when its modified time changes (not atomic)
 - Copying entries to another database file
 - SSH integration (using the included scripts [sshgen](sshgen), [sshknown](sshknown))
