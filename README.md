@@ -14,6 +14,7 @@
   - Every change is saved to entry history
   - Deleted entries are moved to `Recycle Bin`
 - Prevent overwriting the database file when its modified time changes (not atomic)
+  - For file synchronization use e.g. [Syncthing](https://syncthing.net) with [Staggered File Versioning](https://docs.syncthing.net/users/versioning.html)
 - Copying entries to another database file
 - SSH integration (using the included scripts [sshgen](sshgen), [sshknown](sshknown))
 - Custom Attributes
