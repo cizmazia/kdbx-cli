@@ -5,7 +5,7 @@
 ## Features
 
 - Thin wrapper over the [pykeepass](https://github.com/libkeepass/pykeepass) library as the only dependency except the standard Python modules
-- Runs as a single process to avoid the complexity of protecting inter-process communication (unlike [passhole](https://github.com/Evidlo/passhole) which keeps a [background process](https://github.com/libkeepass/pykeepass_cache))
+- Runs as a single process to avoid the complexity of securing inter-process communication (unlike [passhole](https://github.com/Evidlo/passhole) which keeps a [background process](https://github.com/libkeepass/pykeepass_cache))
 - Interoperable with [KDBX 4.0](https://keepass.info/help/kb/kdbx_4.html), [KeePassXC](https://keepassxc.org) and [Keepass2Android Offline](https://github.com/PhilippC/keepass2android)
 - Clipboard integration (using `xclip` by default)
 - Auto-erase clipboard (after `10` seconds by default)
