@@ -234,7 +234,7 @@ class KeeCmd(Cmd):
     def do_agen(self, arg):
         'agen LABEL SIZE # generate new printable attribute'
         a = arg.split()
-        p = filter_urandom(to_int(a[1]), printable) if len(a) == 2 else None
+        p = filter_urandom(to_int(a[1]), owasp) if len(a) == 2 else None
         if not p or not a[0]:
             print(None)
             return
@@ -269,7 +269,7 @@ class KeeCmd(Cmd):
 
     def do_pgen(self, arg):
         'pgen SIZE # generate new printable password'
-        p = filter_urandom(to_int(arg), printable)
+        p = filter_urandom(to_int(arg), owasp)
         if p is None:
             print(None)
             return
@@ -574,8 +574,9 @@ def to_int(s):
 def to_time_str(d):
     return d.astimezone().strftime('%Y.%m.%d_%H.%M.%S')
 
-def printable(b):
-    return 32 <= b and b <= 125
+# https://owasp.org/www-community/password-special-characters
+def owasp(b):
+    return alnum(b) or chr(b) in ''' !"#$%&'()*+,-./:;<=>?@[\]^_`{|}~'''
 
 def alnum(b):
     c = chr(b)
