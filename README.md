@@ -36,7 +36,7 @@ Copy/clone the `kdbx-cli` script and make it executable.
 
 Install [pykeepass](https://github.com/libkeepass/pykeepass):
 ```sh
-pip3 install pykeepass==3.2.1
+pip3 install -r requirements.txt
 ```
 
 **MacOS** requires additional configuration for [GNU readline interface](https://docs.python.org/3/library/readline.html) to make tab-completion work:
@@ -70,6 +70,7 @@ General
 - `q`  quit
 - press `Ctrl`+`D` to quit and `Ctrl`+`C` to interrupt
 - `ls`  list entries
+- `find`  find entries
 - `s [TITLE]`  select entry by title
 - `add TITLE`  new entry with title
 - `rename TITLE`  change title

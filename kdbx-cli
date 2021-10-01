@@ -1,5 +1,5 @@
 #! python3
-import pykeepass#==3.2.1
+import pykeepass
 from pykeepass import icons
 from getpass import getpass
 from argparse import ArgumentParser
@@ -9,9 +9,7 @@ from os import path, listdir, urandom, stat
 from datetime import datetime
 import subprocess
 from threading import Timer
-from lxml.builder import E
 from copy import deepcopy
-import base64
 import re
 import uuid
 
@@ -43,6 +41,12 @@ class KeeCmd(Cmd):
 
     def complete_s(self, text, line, begin, end):
         return titles(self.kp, text)
+
+    def do_find(self, arg):
+        'find STRING # find entries'
+        for e in self.kp.entries:
+            if contains(e, arg):
+                print(e.title)
 
     def do_c(self, arg):
         'c # clear clipboard'
@@ -327,18 +331,21 @@ class KeeCmd(Cmd):
 
     def do_rm(self, arg):
         'rm ENTRY... # move entries to recycle bin'
-        e = entries(self.kp, arg.split(), required=False)
-        self.kp.move_entry(e, recycle_bin(self.kp))
+        for e in entries(self.kp, arg.split(), required=False):
+            self.kp.trash_entry(e)
         self.save()
 
     def complete_rm(self, text, line, begin, end):
         return titles(self.kp, text)
 
     def do_restore(self, arg):
-        'restore ENTRY... # restore entries from recycle bin'
+        'restore [ENTRY]... # restore entries from recycle bin'
         e = entries(self.kp, arg.split(), required=False)
-        self.kp.move_entry(e, self.kp.root_group)
-        self.save()
+        if e:
+            self.kp.move_entry(e, self.kp.root_group)
+            self.save()
+        else:
+            print('\n'.join(titles(self.kp, recycled=True)))
 
     def complete_restore(self, text, line, begin, end):
         return titles(self.kp, text, recycled=True)
@@ -364,7 +371,7 @@ class KeeCmd(Cmd):
         a = arg.split() or ['']
         e = entries(self.kp, a[1:])
         if export(a[0], e):
-            self.kp.move_entry(e, recycle_bin(self.kp))
+            self.kp.trash_entry(e)
             self.save()
 
     def complete_mv(self, text, line, begin, end):
@@ -408,9 +415,19 @@ def prompt(entry=None):
     p = '\n\033[34m' + t + '\033[0m' + p
     return p
 
+def contains(e, arg):
+    s = arg.lower()
+    return (
+        s in e.title.lower()
+        or s in (e.url or '').lower()
+        or s in (e.username or '').lower()
+        or s in ' '.join(note_labels(e)).lower()
+        or s in ' '.join(attr_labels(e)).lower()
+    )
+
 def fields(entry):
     return [
-        ('Group', entry.group.path),
+        ('Group', '/'.join(p or '' for p in entry.group.path)),
         ('Title', entry.title),
         ('URL', entry.url),
         ('Username', entry.username),
@@ -429,7 +446,7 @@ def history(entry):
     hl = getattr(e, 'history', [])
     while hl:
         h = hl.pop()
-        cl.append((to_time_str(e.mtime), ', '.join(changes(e, h))))
+        cl.append((to_time_str(h.mtime), ', '.join(changes(e, h))))
         e = h
     return cl
 
@@ -535,7 +552,7 @@ def export(filename, entries):
     return True
 
 def in_recycle_bin(kp, entry):
-    b = recycle_bin(kp, create=False)
+    b = kp.recyclebin_group
     if not b:
         return False
     uid = b.uuid
@@ -546,27 +563,6 @@ def in_recycle_bin(kp, entry):
         g = g.parentgroup
     return False
 
-def recycle_bin(kp, create=True):
-    meta = kp._xpath('/KeePassFile/Meta',first=True)
-    e = meta.find('RecycleBinUUID')
-    if e is None and not create:
-        return None
-    uid = uuid.UUID(bytes=base64.b64decode(e.text))
-    g = kp.find_groups_by_uuid(uid, first=True)
-    if g or not create:
-        return g
-    g = kp.add_group(kp.root_group, 'Recycle Bin', icon=icons.RECYCLE_BIN)
-    g._set_subelement_text('EnableSearching', 'false')
-    set_subelement_text(meta, 'RecycleBinUUID', g._get_subelement_text('UUID'))
-    set_subelement_text(meta, 'RecycleBinEnabled', 'True')
-    return g
-
-def set_subelement_text(e, tag, value):
-    v = e.find(tag)
-    if v is not None:
-        e.remove(v)
-    e.append(getattr(E, tag)(value))
-
 def to_int(s):
     try: return int(s)
     except ValueError: return None
@@ -576,7 +572,7 @@ def to_time_str(d):
 
 # https://owasp.org/www-community/password-special-characters
 def owasp(b):
-    return alnum(b) or chr(b) in ''' !"#$%&'()*+,-./:;<=>?@[\]^_`{|}~'''
+    return alnum(b) or chr(b) in '''!"#$%&'()*+,-./:<=>?@[\]^_{|}'''
 
 def alnum(b):
     c = chr(b)
@@ -651,6 +647,7 @@ def main(db):
             kp.read(password=kp.password,keyfile=kp.keyfile,transformed_key=kp.transformed_key)
 
 if __name__ == '__main__':
+    print('pykeepass ' + pykeepass.__version__)
     args = ArgumentParser()
     args.add_argument('--clip')
     args.add_argument('--clip-seconds',  type=int)
