@@ -369,9 +369,10 @@ class KeeCmd(Cmd):
     def do_mv(self, arg):
         'mv FILE ENTRY... # copy entries to db file, then move to recycle bin'
         a = arg.split() or ['']
-        e = entries(self.kp, a[1:])
-        if export(a[0], e):
-            self.kp.trash_entry(e)
+        l = entries(self.kp, a[1:])
+        if export(a[0], l):
+            for e in l:
+                self.kp.trash_entry(e)
             self.save()
 
     def complete_mv(self, text, line, begin, end):
