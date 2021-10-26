@@ -45,7 +45,13 @@ class KeeCmd(Cmd):
     def do_find(self, arg):
         'find STRING # find entries'
         for e in self.kp.entries:
-            if contains(e, arg):
+            if contains(e, arg) and not in_recycle_bin(self.kp, e):
+                print(e.title)
+
+    def do_dig(self, arg):
+        'dig STRING # find entries in recycle bin'
+        for e in self.kp.entries:
+            if contains(e, arg) and in_recycle_bin(self.kp, e):
                 print(e.title)
 
     def do_c(self, arg):

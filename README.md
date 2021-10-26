@@ -70,7 +70,8 @@ General
 - `q`  quit
 - press `Ctrl`+`D` to quit and `Ctrl`+`C` to interrupt
 - `ls`  list entries
-- `find`  find entries
+- `find STRING`  find entries
+- `dig STRING` find entries in recycle bin
 - `s [TITLE]`  select entry by title
 - `add TITLE`  new entry with title
 - `rename TITLE`  change title
