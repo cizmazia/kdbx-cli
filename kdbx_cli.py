@@ -74,6 +74,10 @@ class KeeCmd(Cmd):
         'pd # display password'
         print(field(self.entry, 'password'))
 
+    def do_pc(self, arg):
+        'pc # pipe password'
+        pipe(field(self.entry, 'password'))
+
     def do_ssh(self, arg):
         'ssh [TIME] # ssh-add private key (from password)'
         p = {'time': arg or '10m'}
@@ -94,6 +98,10 @@ class KeeCmd(Cmd):
         'ud # display username'
         print(field(self.entry, 'username'))
 
+    def do_uc(self, arg):
+        'uc # pipe username'
+        pipe(field(self.entry, 'username'))
+
     def do_l(self, arg):
         'l # clip location (URL)'
         temp_clip(field(self.entry, 'url'))
@@ -101,6 +109,10 @@ class KeeCmd(Cmd):
     def do_ld(self, arg):
         'ld # display location (URL)'
         print(field(self.entry, 'url'))
+
+    def do_lc(self, arg):
+        'lc # pipe location (URL)'
+        pipe(field(self.entry, 'url'))
 
     def do_n(self, arg):
         'n LABEL # clip note by label'
@@ -114,6 +126,13 @@ class KeeCmd(Cmd):
         print(note(self.entry, arg))
 
     def complete_nd(self, text, line, begin, end):
+        return note_labels(self.entry, text)
+
+    def do_nc(self, arg):
+        'nc LABEL # pipe note by label'
+        pipe(note(self.entry, arg))
+
+    def complete_nc(self, text, line, begin, end):
         return note_labels(self.entry, text)
 
     def do_ndump(self, arg):
@@ -132,6 +151,13 @@ class KeeCmd(Cmd):
         print(attr(self.entry, arg))
 
     def complete_ad(self, text, line, begin, end):
+        return attr_labels(self.entry, text)
+
+    def do_ac(self, arg):
+        'ac LABEL # pipe attribute by label'
+        pipe(attr(self.entry, arg))
+
+    def complete_ac(self, text, line, begin, end):
         return attr_labels(self.entry, text)
 
     def do_h(self, arg):
@@ -648,6 +674,7 @@ def open(filename):
 
 clip_cmd = 'xclip -sel c'
 paste_cmd = 'xclip -o -sel c'
+pipe_cmd = 'tee'
 ssh_add_fmt = 'ssh-add -t {time} -'
 ssh_gen_cmd = 'sshgen'
 ssh_known_cmd = 'sshknown'
@@ -680,6 +707,10 @@ def temp_clip(s):
     Timer(clip_seconds, lambda: paste() != s or clip('')).start()
 
 
+def pipe(s):
+    stdin(pipe_cmd, s)
+
+
 def ssh_gen():
     r = stdout(ssh_gen_cmd)
     return ssh_re.match(r).group(1, 2) if r else (None, None)
@@ -704,6 +735,7 @@ if __name__ == '__main__':
     args.add_argument('--clip')
     args.add_argument('--clip-seconds',  type=int)
     args.add_argument('--paste')
+    args.add_argument('--pipe')
     args.add_argument('--ssh-add')
     args.add_argument('--ssh-gen')
     args.add_argument('--ssh-known')
@@ -712,6 +744,7 @@ if __name__ == '__main__':
     clip_cmd = o.clip or clip_cmd
     clip_seconds = o.clip_seconds or clip_seconds
     paste_cmd = o.paste or paste_cmd
+    pipe_cmd = o.pipe or pipe_cmd
     ssh_add_fmt = o.ssh_add or ssh_add_fmt
     ssh_gen_cmd = o.ssh_gen or ssh_gen_cmd
     ssh_known_cmd = o.ssh_known or ssh_known_cmd

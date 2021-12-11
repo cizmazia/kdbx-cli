@@ -16,6 +16,7 @@
 - Prevent overwriting the database file when its modified time changes (not atomic)
   - For file synchronization use e.g. [Syncthing](https://syncthing.net) with [Staggered File Versioning](https://docs.syncthing.net/users/versioning.html)
 - Copying entries to another database file
+- Print QR codes (using the pipe commands; run e.g. with `--pipe "qrencode -t utf8"`)
 - SSH integration (using the included scripts [sshgen](sshgen), [sshknown](sshknown))
 - Custom Attributes
 - Notes are line-separated and prepended with a label
@@ -89,15 +90,20 @@ Read Entry
 - `h [TIME]`  select history item
 - `p`  clip password
 - `pd`  display password
+- `pc` pipe password
 - `u`  clip username
 - `ud`  display username
+- `uc` pipe username
 - `l`  clip location (URL)
 - `ld`  display location (URL)
+- `lc` pipe location (URL)
 - `n LABEL`  clip note by label
 - `nd LABEL`  display note by label
+- `nc LABEL` pipe note by label
 - `ndump`  display notes
 - `a LABEL`  clip attribute by label
 - `ad LABEL`  display attribute by label
+- `ac LABEL` pipe attribute by label
 - `ssh [TIME]`  ssh-add private key (from password)
 - `sshknown`  add to known_hosts (from URL)
 
