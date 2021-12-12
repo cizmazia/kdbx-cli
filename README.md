@@ -49,12 +49,12 @@ brew reinstall readline
 ```
 **MacOS** uses `pbcopy` instead of `xclip`:
 ```sh
-alias kp='kp --clip "pbcopy" --paste "pbpaste"'
+alias kp='kdbx_cli.py --clip "pbcopy" --paste "pbpaste"'
 ```
 
 On **Windows** or **WSL**, `win32yank` can be used (e.g. installed with [neovim](https://github.com/neovim/neovim/wiki/FAQ#how-to-use-the-windows-clipboard-from-wsl) by default):
 ```sh
-alias kp='kp --clip "win32yank.exe -i --crlf" --paste "win32yank.exe -o --lf"'
+alias kp='kdbx_cli.py --clip "win32yank.exe -i --crlf" --paste "win32yank.exe -o --lf"'
 ```
 
 ## Commands
