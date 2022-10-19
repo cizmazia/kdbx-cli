@@ -7,7 +7,7 @@
 - Thin wrapper over the [pykeepass](https://github.com/libkeepass/pykeepass) library as the only dependency except the standard Python modules
 - Runs as a single process to avoid the complexity of securing inter-process communication (unlike [passhole](https://github.com/Evidlo/passhole) which keeps a [background process](https://github.com/libkeepass/pykeepass_cache))
 - Interoperable with [KDBX 4.0](https://keepass.info/help/kb/kdbx_4.html), [KeePassXC](https://keepassxc.org) and [Keepass2Android Offline](https://github.com/PhilippC/keepass2android)
-- Clipboard integration (using `xclip` by default)
+- Clipboard integration (using `xsel` by default)
 - Auto-erase clipboard (after `10` seconds by default)
 - Auto-completion using the `tab` key
 - No destructive operations 
@@ -47,7 +47,7 @@ python:bind ^I rl_complete
 EOM
 brew reinstall readline
 ```
-**MacOS** uses `pbcopy` instead of `xclip`:
+**MacOS** uses `pbcopy` instead of `xsel`:
 ```sh
 alias kp='kdbx_cli.py --clip "pbcopy" --paste "pbpaste"'
 ```
@@ -91,6 +91,7 @@ Read Entry
 - `p`  clip password
 - `pd`  display password
 - `pc` pipe password
+- `pv` verify password
 - `u`  clip username
 - `ud`  display username
 - `uc` pipe username
@@ -106,6 +107,9 @@ Read Entry
 - `ac LABEL` pipe attribute by label
 - `ssh [TIME]`  ssh-add private key (from password)
 - `sshknown`  add to known_hosts (from URL)
+- `otp` clip TOTP
+- `otpd` display TOTP
+- `otpuri` display OTP uri
 
 Modify Entry
 - `pput`  change password
@@ -119,6 +123,8 @@ Modify Entry
 - `aput LABEL`  change attribute by label
 - `apaste LABEL`  paste new attribute by label
 - `arm LABEL`  remove attribute by label
+- `otpput` change TOTP secret
+- `otppaste` paste new TOTP secret
 
 Generate Entry Passwords
 - `agen LABEL SIZE`  generate new printable attribute

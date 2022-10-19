@@ -1,5 +1,6 @@
 #! python3
 import pykeepass
+import pyotp
 from getpass import getpass
 from argparse import ArgumentParser
 from cmd import Cmd
@@ -11,6 +12,7 @@ from threading import Timer
 from copy import deepcopy
 import re
 import uuid
+from importlib.metadata import version
 
 
 class KeeCmd(Cmd):
@@ -77,6 +79,22 @@ class KeeCmd(Cmd):
     def do_pc(self, arg):
         'pc # pipe password'
         pipe(field(self.entry, 'password'))
+
+    def do_pv(self, arg):
+        'pv # verify password'
+        print(getpass() == field(self.entry, 'password'))
+
+    def do_otp(self, arg):
+        'otp # clip TOTP'
+        temp_clip(pyotp.parse_uri(field(self.entry, 'otp')).now())
+
+    def do_otpd(self, arg):
+        'otpd # display TOTP'
+        print(pyotp.parse_uri(field(self.entry, 'otp')).now())
+
+    def do_otpuri(self, arg):
+        'otpuri # display OTP uri'
+        print(field(self.entry, 'otp'))
 
     def do_ssh(self, arg):
         'ssh [TIME] # ssh-add private key (from password)'
@@ -201,6 +219,16 @@ class KeeCmd(Cmd):
         s = paste()
         if s:
             self.update(lambda e: setattr(e, 'password', s))
+
+    def do_otpput(self, arg):
+        'otpput # change TOTP secret'
+        self.update(lambda e: setattr(e, 'otp', pyotp.TOTP(getpass(prompt='TOTP secret: ')).provisioning_uri()))
+
+    def do_otppaste(self, arg):
+        'otppaste # paste new TOTP secret'
+        s = paste()
+        if s:
+            self.update(lambda e: setattr(e, 'otp', pyotp.TOTP(s).provisioning_uri()))
 
     def do_uput(self, arg):
         'uput # change username'
@@ -467,6 +495,7 @@ def fields(entry):
         ('URL', entry.url),
         ('Username', entry.username),
         ('Password', str(len(entry.password)) if entry.password else ''),
+        ('OTP', str(len(pyotp.parse_uri(entry.otp).secret)) if entry.otp else ''),
         ('Notes', ', '.join(note_labels(entry))),
         ('Attributes', ', '.join(attr_labels(entry))),
         ('Modified', to_time_str(entry.mtime)),
@@ -499,6 +528,8 @@ def changes(new, old):
         res.append('Username')
     if new.password != old.password:
         res.append('Password')
+    if new.otp != old.otp:
+        res.append('OTP')
     if notes(new) != notes(old):
         res.append('Notes')
     if new.custom_properties != old.custom_properties:
@@ -672,13 +703,13 @@ def open(filename):
         return None
 
 
-clip_cmd = 'xclip -sel c'
-paste_cmd = 'xclip -o -sel c'
+clip_cmd = 'xsel -ib'
+paste_cmd = 'xsel -ob'
 pipe_cmd = 'tee'
 ssh_add_fmt = 'ssh-add -t {time} -'
 ssh_gen_cmd = 'sshgen'
 ssh_known_cmd = 'sshknown'
-ssh_re = re.compile(r'(-*BEGIN[^\n]*.*\n-*END[^\n]*\n)(.*)', re.DOTALL)
+ssh_re = re.compile(r'(-*BEGIN[^\n]*.*\n-*END[^\n]*\n)([^\n]*)', re.DOTALL)
 clip_seconds = 10
 
 
@@ -699,7 +730,8 @@ def clip(s):
 
 
 def paste():
-    return stdout(paste_cmd)
+    s = stdout(paste_cmd)
+    return s.rstrip('\r\n') if s else None
 
 
 def temp_clip(s):
@@ -730,7 +762,8 @@ def main(db):
 
 
 if __name__ == '__main__':
-    print('pykeepass ' + pykeepass.__version__)
+    print('pykeepass ' + version('pykeepass'))
+    print('pyotp ' + version('pyotp'))
     args = ArgumentParser()
     args.add_argument('--clip')
     args.add_argument('--clip-seconds',  type=int)
