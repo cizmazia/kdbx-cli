@@ -1,4 +1,4 @@
-#! python3
+#!/usr/bin/env python3
 import pykeepass
 import pyotp
 from getpass import getpass
