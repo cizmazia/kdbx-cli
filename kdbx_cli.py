@@ -33,7 +33,11 @@ class KeeCmd(Cmd):
 
     def do_ls(self, arg):
         'ls # list entries'
-        print('\n'.join(titles(self.kp)))
+        print('\n'.join(sorted(titles(self.kp))))
+
+    def do_lt(self, arg):
+        'lt # list entries by modified time'
+        print('\n'.join('\033[36m' + k + '\033[0m: ' + v for k, v in titles_by_mtime(self.kp)))
 
     def do_s(self, arg):
         's [TITLE] # select entry by title'
@@ -76,6 +80,10 @@ class KeeCmd(Cmd):
         'pd # display password'
         print(field(self.entry, 'password'))
 
+    def do_ps(self, arg):
+        'ps # partially display password'
+        sample(field(self.entry, 'password'))
+
     def do_pc(self, arg):
         'pc # pipe password'
         pipe(field(self.entry, 'password'))
@@ -86,11 +94,11 @@ class KeeCmd(Cmd):
 
     def do_otp(self, arg):
         'otp # clip TOTP'
-        temp_clip(pyotp.parse_uri(field(self.entry, 'otp')).now())
+        temp_clip(otp_code(field(self.entry, 'otp')))
 
     def do_otpd(self, arg):
         'otpd # display TOTP'
-        print(pyotp.parse_uri(field(self.entry, 'otp')).now())
+        print(otp_code(field(self.entry, 'otp')))
 
     def do_otpuri(self, arg):
         'otpuri # display OTP uri'
@@ -169,6 +177,13 @@ class KeeCmd(Cmd):
         print(attr(self.entry, arg))
 
     def complete_ad(self, text, line, begin, end):
+        return attr_labels(self.entry, text)
+
+    def do_as(self, arg):
+        'as LABEL # partially display attribute by label'
+        sample(attr(self.entry, arg))
+
+    def complete_as(self, text, line, begin, end):
         return attr_labels(self.entry, text)
 
     def do_ac(self, arg):
@@ -252,11 +267,26 @@ class KeeCmd(Cmd):
 
     def do_nput(self, arg):
         'nput LABEL # change note by label'
-        n = notes(self.entry)
-        n[arg.strip()] = getpass(prompt='Note: ')
-        self.update(lambda e: setattr(e, 'notes', notes_str(n)))
+        label = arg.strip()
+        s = getpass(prompt='Note: ')
+        if label and s:
+            n = notes(self.entry)
+            n[label] = s
+            self.update(lambda e: setattr(e, 'notes', notes_str(n)))
 
     def complete_nput(self, text, line, begin, end):
+        return note_labels(self.entry, text)
+
+    def do_npaste(self, arg):
+        'npaste LABEL # paste new note with label'
+        label = arg.strip()
+        s = paste()
+        if label and s:
+            n = notes(self.entry)
+            n[label] = s
+            self.update(lambda e: setattr(e, 'notes', notes_str(n)))
+
+    def complete_npaste(self, text, line, begin, end):
         return note_labels(self.entry, text)
 
     def do_nrm(self, arg):
@@ -301,7 +331,7 @@ class KeeCmd(Cmd):
         if not p or not a[0]:
             print(None)
             return
-        self.update(lambda e: e.set_custom_property(a[0], p.decode()))
+        self.update(lambda e: e.set_custom_property(a[0], p))
 
     def complete_agen(self, text, line, begin, end):
         return attr_labels(self.entry, text)
@@ -313,9 +343,21 @@ class KeeCmd(Cmd):
         if not p or not a[0]:
             print(None)
             return
-        self.update(lambda e: e.set_custom_property(a[0], p.decode()))
+        self.update(lambda e: e.set_custom_property(a[0], p))
 
     def complete_agena(self, text, line, begin, end):
+        return attr_labels(self.entry, text)
+
+    def do_agenc(self, arg):
+        'agenc LABEL SIZE # generate new crockford attribute'
+        a = arg.split()
+        p = filter_urandom(to_int(a[1]), crockford) if len(a) == 2 else None
+        if not p or not a[0]:
+            print(None)
+            return
+        self.update(lambda e: e.set_custom_property(a[0], p))
+
+    def complete_agenc(self, text, line, begin, end):
         return attr_labels(self.entry, text)
 
     def do_agend(self, arg):
@@ -325,7 +367,7 @@ class KeeCmd(Cmd):
         if not p or not a[0]:
             print(None)
             return
-        self.update(lambda e: e.set_custom_property(a[0], p.decode()))
+        self.update(lambda e: e.set_custom_property(a[0], p))
 
     def complete_agend(self, text, line, begin, end):
         return attr_labels(self.entry, text)
@@ -336,7 +378,7 @@ class KeeCmd(Cmd):
         if p is None:
             print(None)
             return
-        self.update(lambda e: setattr(e, 'password', p.decode()))
+        self.update(lambda e: setattr(e, 'password', p))
 
     def do_pgena(self, arg):
         'pgena SIZE # generate new alphanumeric password'
@@ -344,7 +386,15 @@ class KeeCmd(Cmd):
         if p is None:
             print(None)
             return
-        self.update(lambda e: setattr(e, 'password', p.decode()))
+        self.update(lambda e: setattr(e, 'password', p))
+
+    def do_pgenc(self, arg):
+        'pgenc SIZE # generate new crockford password'
+        p = filter_urandom(to_int(arg), crockford)
+        if p is None:
+            print(None)
+            return
+        self.update(lambda e: setattr(e, 'password', p))
 
     def do_pgend(self, arg):
         'pgend SIZE # generate new digit password'
@@ -352,41 +402,13 @@ class KeeCmd(Cmd):
         if p is None:
             print(None)
             return
-        self.update(lambda e: setattr(e, 'password', p.decode()))
+        self.update(lambda e: setattr(e, 'password', p))
 
     def do_sshgen(self, arg):
         'sshgen # generate ssh keys'
         key, pub = ssh_gen()
         self.update(lambda e: setattr(e, 'username', pub), save=False)
         self.update(lambda e: setattr(e, 'password', key))
-
-    def do_ngena(self, arg):
-        'ngena LABEL SIZE # generate new alphanumeric note'
-        a = arg.split()
-        p = filter_urandom(to_int(a[1]), alnum) if len(a) == 2 else None
-        if not p:
-            print(None)
-            return
-        n = notes(self.entry)
-        n[a[0]] = p.decode()
-        self.update(lambda e: setattr(e, 'notes', notes_str(n)))
-
-    def complete_ngena(self, text, line, begin, end):
-        return note_labels(self.entry, text)
-
-    def do_ngend(self, arg):
-        'ngend LABEL SIZE # generate new digit note'
-        a = arg.split()
-        p = filter_urandom(to_int(a[1]), decimal) if len(a) == 2 else None
-        if not p:
-            print(None)
-            return
-        n = notes(self.entry)
-        n[a[0]] = p.decode()
-        self.update(lambda e: setattr(e, 'notes', notes_str(n)))
-
-    def complete_ngend(self, text, line, begin, end):
-        return note_labels(self.entry, text)
 
     def do_rm(self, arg):
         'rm ENTRY... # move entries to recycle bin'
@@ -404,7 +426,7 @@ class KeeCmd(Cmd):
             self.kp.move_entry(e, self.kp.root_group)
             self.save()
         else:
-            print('\n'.join(titles(self.kp, recycled=True)))
+            print('\n'.join(sorted(titles(self.kp, recycled=True))))
 
     def complete_restore(self, text, line, begin, end):
         return titles(self.kp, text, recycled=True)
@@ -495,9 +517,9 @@ def fields(entry):
         ('URL', entry.url),
         ('Username', entry.username),
         ('Password', str(len(entry.password)) if entry.password else ''),
-        ('OTP', str(len(pyotp.parse_uri(entry.otp).secret)) if entry.otp else ''),
-        ('Notes', ', '.join(note_labels(entry))),
-        ('Attributes', ', '.join(attr_labels(entry))),
+        ('OTP', str(len(otp_secret(entry.otp))) if entry.otp else ''),
+        ('Notes', ', '.join(sorted(note_labels(entry)))),
+        ('Attributes', ', '.join(sorted(attr_labels(entry)))),
         ('Modified', to_time_str(entry.mtime)),
         ('History', str(len(entry.history)) if entry.history else ''),
     ] if entry else []
@@ -581,6 +603,13 @@ def titles(kp, prefix='', recycled=False):
         x.title for x in kp.entries
         if x.title.startswith(prefix) and recycled == in_recycle_bin(kp, x)
     ]
+
+
+def titles_by_mtime(kp, recycled=False):
+    return sorted([
+        (to_time_str(x.mtime), x.title) for x in kp.entries
+        if recycled == in_recycle_bin(kp, x)
+    ])
 
 
 def update(entry, f):
@@ -681,6 +710,11 @@ def decimal(b):
     return ('0' <= c and c <= '9')
 
 
+# https://github.com/jbittel/base32-crockford
+def crockford(b):
+    return chr(b) in '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
+
+
 def filter_urandom(size, cond, block_size=512):
     if not size or size <= 0:
         return None
@@ -689,15 +723,17 @@ def filter_urandom(size, cond, block_size=512):
         for b in urandom(block_size):
             if cond(b):
                 res.append(b)
-    return bytes(res[:size])
+    return bytes(res[:size]).decode()
 
 
 def open(filename):
-    db = path.expanduser(filename)
-    if not path.exists(db):
-        return pykeepass.create_database(db, password=getpass())
     try:
+        db = path.expanduser(filename)
+        if not path.exists(db):
+            return pykeepass.create_database(db, password=getpass())
         return pykeepass.PyKeePass(db, password=getpass())
+    except FileNotFoundError:
+        print('wrong dir')
     except pykeepass.exceptions.CredentialsError:
         print('wrong password')
         return None
@@ -743,9 +779,27 @@ def pipe(s):
     stdin(pipe_cmd, s)
 
 
+def sample(s):
+    print(re.sub(r'^(.{4}).*(.{4})$', '\g<1>***\g<2>', s))
+
+
 def ssh_gen():
     r = stdout(ssh_gen_cmd)
     return ssh_re.match(r).group(1, 2) if r else (None, None)
+
+
+def otp_code(uri):
+    try:
+        return pyotp.parse_uri(uri).now()
+    except (TypeError, ValueError):
+        return None
+
+
+def otp_secret(uri):
+    try:
+        return pyotp.parse_uri(uri).secret
+    except (ValueError):
+        return ''
 
 
 def main(db):
