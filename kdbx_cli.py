@@ -12,198 +12,206 @@ from threading import Timer
 from copy import deepcopy
 import re
 import uuid
+import time
 from importlib.metadata import version
 
 
-class KeeCmd(Cmd):
+class KpCmd(Cmd):
     def __init__(self, kp):
-        self.kp = kp
-        self.mtime = stat(kp.filename).st_mtime
-        self.entry = None
+        self.ui = KpUi(kp)
         self.prompt = prompt()
         Cmd.__init__(self)
 
-    def do_EOF(self, arg):
+    def emptyline(self):
+        pass
+
+    def precmd(self, line):
+        if self.ui.locked():
+            return 'EOF'
+        self.ui.reset_timeout()
+        return line
+
+    def do_EOF(self, _arg=None):
         'press Ctrl+D to quit and Ctrl+C to interrupt'
         return True
 
-    def do_q(self, arg):
+    def do_q(self, _arg=None):
         'q # quit'
         return True
 
-    def do_ls(self, arg):
+    def do_ls(self, _arg=None):
         'ls # list entries'
-        print('\n'.join(sorted(titles(self.kp))))
+        print('\n'.join(sorted(self.ui.titles())))
 
-    def do_lt(self, arg):
+    def do_lt(self, _arg=None):
         'lt # list entries by modified time'
-        print('\n'.join('\033[36m' + k + '\033[0m: ' + v for k, v in titles_by_mtime(self.kp)))
+        print('\n'.join('\033[36m' + k + '\033[0m: ' + v for k, v in self.ui.titles_by_mtime()))
 
     def do_s(self, arg):
         's [TITLE] # select entry by title'
-        entry = self.kp.find_entries(title=arg, first=True)
-        self.entry = entry
+        entry = self.ui.find_entry(arg)
+        self.ui.set_entry(entry)
         self.prompt = prompt(entry)
 
     def complete_s(self, text, line, begin, end):
-        return titles(self.kp, text)
+        return self.ui.titles(text)
 
     def do_find(self, arg):
         'find STRING # find entries'
-        for e in self.kp.entries:
-            if contains(e, arg) and not in_recycle_bin(self.kp, e):
+        for e in self.ui.entries():
+            if contains(e, arg) and not self.ui.in_recycle_bin(e):
                 print(e.title)
 
     def do_dig(self, arg):
         'dig STRING # find entries in recycle bin'
-        for e in self.kp.entries:
-            if contains(e, arg) and in_recycle_bin(self.kp, e):
+        for e in self.ui.entries():
+            if contains(e, arg) and self.ui.in_recycle_bin(e):
                 print(e.title)
 
-    def do_c(self, arg):
+    def do_c(self, _arg=None):
         'c # clear clipboard'
         clip('')
 
-    def do_dump(self, arg):
+    def do_dump(self, _arg=None):
         'dump # display fields'
-        print('\n'.join('\033[36m' + k + '\033[0m: ' + v for k, v in fields(self.entry) if v))
+        print('\n'.join('\033[36m' + k + '\033[0m: ' + v for k, v in fields(self.ui.entry()) if v))
 
-    def do_history(self, arg):
+    def do_history(self, _arg=None):
         'history # display changes'
-        print('\n'.join('\033[36m' + k + '\033[0m: ' + v for k, v in history(self.entry)))
+        print('\n'.join('\033[36m' + k + '\033[0m: ' + v for k, v in history(self.ui.entry())))
 
-    def do_p(self, arg):
+    def do_p(self, _arg=None):
         'p # clip password'
-        temp_clip(field(self.entry, 'password'))
+        temp_clip(field(self.ui.entry(), 'password'))
 
-    def do_pd(self, arg):
+    def do_pd(self, _arg=None):
         'pd # display password'
-        print(field(self.entry, 'password'))
+        print(field(self.ui.entry(), 'password'))
 
-    def do_ps(self, arg):
+    def do_ps(self, _arg=None):
         'ps # partially display password'
-        sample(field(self.entry, 'password'))
+        sample(field(self.ui.entry(), 'password'))
 
-    def do_pc(self, arg):
+    def do_pc(self, _arg=None):
         'pc # pipe password'
-        pipe(field(self.entry, 'password'))
+        pipe(field(self.ui.entry(), 'password'))
 
-    def do_pv(self, arg):
+    def do_pv(self, _arg=None):
         'pv # verify password'
-        print(getpass() == field(self.entry, 'password'))
+        print(getpass() == field(self.ui.entry(), 'password'))
 
-    def do_otp(self, arg):
+    def do_otp(self, _arg=None):
         'otp # clip TOTP'
-        temp_clip(otp_code(field(self.entry, 'otp')))
+        temp_clip(otp_code(field(self.ui.entry(), 'otp')))
 
-    def do_otpd(self, arg):
+    def do_otpd(self, _arg=None):
         'otpd # display TOTP'
-        print(otp_code(field(self.entry, 'otp')))
+        print(otp_code(field(self.ui.entry(), 'otp')))
 
-    def do_otpuri(self, arg):
+    def do_otpuri(self, _arg=None):
         'otpuri # display OTP uri'
-        print(field(self.entry, 'otp'))
+        print(field(self.ui.entry(), 'otp'))
 
     def do_ssh(self, arg):
         'ssh [TIME] # ssh-add private key (from password)'
         p = {'time': arg or '10m'}
-        stdin(ssh_add_fmt.format(**p), field(self.entry, 'password'))
+        stdin(ssh_add_fmt.format(**p), field(self.ui.entry(), 'password'))
 
     def complete_ssh(self, text, line, begin, end):
         return [x for x in ['10s', '10m', '10h', '10d'] if x.startswith(text)]
 
-    def do_sshknown(self, arg):
+    def do_sshknown(self, _arg=None):
         'sshknown # add to known_hosts (from URL)'
-        stdin(ssh_known_cmd, field(self.entry, 'url'))
+        stdin(ssh_known_cmd, field(self.ui.entry(), 'url'))
 
-    def do_u(self, arg):
+    def do_u(self, _arg=None):
         'u # clip username'
-        temp_clip(field(self.entry, 'username'))
+        temp_clip(field(self.ui.entry(), 'username'))
 
-    def do_ud(self, arg):
+    def do_ud(self, _arg=None):
         'ud # display username'
-        print(field(self.entry, 'username'))
+        print(field(self.ui.entry(), 'username'))
 
-    def do_uc(self, arg):
+    def do_uc(self, _arg=None):
         'uc # pipe username'
-        pipe(field(self.entry, 'username'))
+        pipe(field(self.ui.entry(), 'username'))
 
-    def do_l(self, arg):
+    def do_l(self, _arg=None):
         'l # clip location (URL)'
-        temp_clip(field(self.entry, 'url'))
+        temp_clip(field(self.ui.entry(), 'url'))
 
-    def do_ld(self, arg):
+    def do_ld(self, _arg=None):
         'ld # display location (URL)'
-        print(field(self.entry, 'url'))
+        print(field(self.ui.entry(), 'url'))
 
-    def do_lc(self, arg):
+    def do_lc(self, _arg=None):
         'lc # pipe location (URL)'
-        pipe(field(self.entry, 'url'))
+        pipe(field(self.ui.entry(), 'url'))
 
     def do_n(self, arg):
         'n LABEL # clip note by label'
-        temp_clip(note(self.entry, arg))
+        temp_clip(note(self.ui.entry(), arg))
 
     def complete_n(self, text, line, begin, end):
-        return note_labels(self.entry, text)
+        return note_labels(self.ui.entry(), text)
 
     def do_nd(self, arg):
         'nd LABEL # display note by label'
-        print(note(self.entry, arg))
+        print(note(self.ui.entry(), arg))
 
     def complete_nd(self, text, line, begin, end):
-        return note_labels(self.entry, text)
+        return note_labels(self.ui.entry(), text)
 
     def do_nc(self, arg):
         'nc LABEL # pipe note by label'
-        pipe(note(self.entry, arg))
+        pipe(note(self.ui.entry(), arg))
 
     def complete_nc(self, text, line, begin, end):
-        return note_labels(self.entry, text)
+        return note_labels(self.ui.entry(), text)
 
-    def do_ndump(self, arg):
+    def do_ndump(self, _arg=None):
         'ndump # display notes'
-        print(field(self.entry, 'notes'))
+        print(field(self.ui.entry(), 'notes'))
 
     def do_a(self, arg):
         'a LABEL # clip attribute by label'
-        temp_clip(attr(self.entry, arg))
+        temp_clip(attr(self.ui.entry(), arg))
 
     def complete_a(self, text, line, begin, end):
-        return attr_labels(self.entry, text)
+        return attr_labels(self.ui.entry(), text)
 
     def do_ad(self, arg):
         'ad LABEL # display attribute by label'
-        print(attr(self.entry, arg))
+        print(attr(self.ui.entry(), arg))
 
     def complete_ad(self, text, line, begin, end):
-        return attr_labels(self.entry, text)
+        return attr_labels(self.ui.entry(), text)
 
     def do_as(self, arg):
         'as LABEL # partially display attribute by label'
-        sample(attr(self.entry, arg))
+        sample(attr(self.ui.entry(), arg))
 
     def complete_as(self, text, line, begin, end):
-        return attr_labels(self.entry, text)
+        return attr_labels(self.ui.entry(), text)
 
     def do_ac(self, arg):
         'ac LABEL # pipe attribute by label'
-        pipe(attr(self.entry, arg))
+        pipe(attr(self.ui.entry(), arg))
 
     def complete_ac(self, text, line, begin, end):
-        return attr_labels(self.entry, text)
+        return attr_labels(self.ui.entry(), text)
 
     def do_h(self, arg):
         'h [TIME] # select history item'
-        e = parent_entry(self.entry)
+        e = parent_entry(self.ui.entry())
         for h in getattr(e, 'history', []):
             if arg == to_time_str(h.mtime):
                 e = h
-        self.entry = e
+        self.ui.set_entry(e)
         self.prompt = prompt(e)
 
     def complete_h(self, text, line, begin, end):
-        e = parent_entry(self.entry)
+        e = parent_entry(self.ui.entry())
         return [
             d for d in [to_time_str(h.mtime) for h in getattr(e, 'history', [])]
             if d.startswith(text)
@@ -212,117 +220,117 @@ class KeeCmd(Cmd):
     def do_add(self, arg):
         'add TITLE # new entry with title'
         e = None
-        if not self.kp.find_entries(title=arg, first=True):
-            e = pykeepass.entry.Entry(arg, '', '', kp=self.kp)
-            self.kp.root_group.append(e)
-            self.save()
-        self.entry = e
+        if not self.ui.find_entry(arg):
+            e = self.ui.add_entry(arg)
+            self.ui.save()
+        self.ui.set_entry(e)
         self.prompt = prompt(e)
 
     def do_rename(self, arg):
         'rename TITLE # change title'
-        if not self.kp.find_entries(title=arg, first=True):
-            self.update(lambda e: setattr(e, 'title', arg))
-            self.prompt = prompt(self.entry)
+        if not self.ui.find_entry(arg):
+            self.ui.update(lambda e: setattr(e, 'title', arg))
+            self.prompt = prompt(self.ui.entry())
 
-    def do_pput(self, arg):
+    def do_pput(self, _arg=None):
         'pput # change password'
-        self.update(lambda e: setattr(e, 'password', getpass()))
+        self.ui.update(lambda e: setattr(e, 'password', getpass()))
 
-    def do_ppaste(self, arg):
+    def do_ppaste(self, _arg=None):
         'ppaste # paste new password'
         s = paste()
         if s:
-            self.update(lambda e: setattr(e, 'password', s))
+            self.ui.update(lambda e: setattr(e, 'password', s))
 
-    def do_otpput(self, arg):
+    def do_otpput(self, _arg=None):
         'otpput # change TOTP secret'
-        self.update(lambda e: setattr(e, 'otp', pyotp.TOTP(getpass(prompt='TOTP secret: ')).provisioning_uri()))
+        self.ui.update(lambda e: setattr(e, 'otp', pyotp.TOTP(getpass(prompt='TOTP secret: ')).provisioning_uri()))
 
-    def do_otppaste(self, arg):
+    def do_otppaste(self, _arg=None):
         'otppaste # paste new TOTP secret'
         s = paste()
         if s:
-            self.update(lambda e: setattr(e, 'otp', pyotp.TOTP(s).provisioning_uri()))
+            self.ui.update(lambda e: setattr(e, 'otp', pyotp.TOTP(s).provisioning_uri()))
 
-    def do_uput(self, arg):
+    def do_uput(self, _arg=None):
         'uput # change username'
-        self.update(lambda e: setattr(e, 'username', getpass(prompt='Username: ')))
+        self.ui.update(lambda e: setattr(e, 'username', getpass(prompt='Username: ')))
 
-    def do_upaste(self, arg):
+    def do_upaste(self, _arg=None):
         'upaste # paste new username'
         s = paste()
         if s:
-            self.update(lambda e: setattr(e, 'username', s))
+            self.ui.update(lambda e: setattr(e, 'username', s))
 
-    def do_lput(self, arg):
+    def do_lput(self, _arg=None):
         'lput # change location (URL)'
-        self.update(lambda e: setattr(e, 'url', getpass(prompt='URL: ')))
+        self.ui.update(lambda e: setattr(e, 'url', getpass(prompt='URL: ')))
 
-    def do_lpaste(self, arg):
+    def do_lpaste(self, _arg=None):
         'lpaste # paste new location'
         s = paste()
         if s:
-            self.update(lambda e: setattr(e, 'url', s))
+            self.ui.update(lambda e: setattr(e, 'url', s))
 
     def do_nput(self, arg):
         'nput LABEL # change note by label'
         label = arg.strip()
         s = getpass(prompt='Note: ')
         if label and s:
-            n = notes(self.entry)
+            n = notes(self.ui.entry())
             n[label] = s
-            self.update(lambda e: setattr(e, 'notes', notes_str(n)))
+            self.ui.update(lambda e: setattr(e, 'notes', notes_str(n)))
 
     def complete_nput(self, text, line, begin, end):
-        return note_labels(self.entry, text)
+        return note_labels(self.ui.entry(), text)
 
     def do_npaste(self, arg):
         'npaste LABEL # paste new note with label'
         label = arg.strip()
         s = paste()
         if label and s:
-            n = notes(self.entry)
+            n = notes(self.ui.entry())
             n[label] = s
-            self.update(lambda e: setattr(e, 'notes', notes_str(n)))
+            self.ui.update(lambda e: setattr(e, 'notes', notes_str(n)))
 
     def complete_npaste(self, text, line, begin, end):
-        return note_labels(self.entry, text)
+        return note_labels(self.ui.entry(), text)
 
     def do_nrm(self, arg):
         'nrm LABEL # remove note by label'
-        n = notes(self.entry)
+        n = notes(self.ui.entry())
         n.pop(arg.strip(), None)
-        self.update(lambda e: setattr(e, 'notes', notes_str(n)))
+        self.ui.update(lambda e: setattr(e, 'notes', notes_str(n)))
 
     def complete_nrm(self, text, line, begin, end):
-        return note_labels(self.entry, text)
+        return note_labels(self.ui.entry(), text)
 
     def do_aput(self, arg):
         'aput LABEL # change attribute by label'
         label = arg.strip()
-        self.update(lambda e: e.set_custom_property(label, getpass(prompt='Attribute: ')))
+        if label:
+            self.ui.update(lambda e: e.set_custom_property(label, getpass(prompt='Attribute: ')))
 
     def complete_aput(self, text, line, begin, end):
-        return attr_labels(self.entry, text)
+        return attr_labels(self.ui.entry(), text)
 
     def do_apaste(self, arg):
         'apaste LABEL # paste new attribute by label'
         label = arg.strip()
         s = paste()
         if label and s:
-            self.update(lambda e: e.set_custom_property(label, s))
+            self.ui.update(lambda e: e.set_custom_property(label, s))
 
     def complete_apaste(self, text, line, begin, end):
-        return attr_labels(self.entry, text)
+        return attr_labels(self.ui.entry(), text)
 
     def do_arm(self, arg):
         'arm LABEL # remove attribute by label'
         label = arg.strip()
-        self.update(lambda e: e.delete_custom_property(label))
+        self.ui.update(lambda e: e.delete_custom_property(label))
 
     def complete_arm(self, text, line, begin, end):
-        return attr_labels(self.entry, text)
+        return attr_labels(self.ui.entry(), text)
 
     def do_agen(self, arg):
         'agen LABEL SIZE # generate new printable attribute'
@@ -331,10 +339,10 @@ class KeeCmd(Cmd):
         if not p or not a[0]:
             print(None)
             return
-        self.update(lambda e: e.set_custom_property(a[0], p))
+        self.ui.update(lambda e: e.set_custom_property(a[0], p))
 
     def complete_agen(self, text, line, begin, end):
-        return attr_labels(self.entry, text)
+        return attr_labels(self.ui.entry(), text)
 
     def do_agena(self, arg):
         'agena LABEL SIZE # generate new alphanumeric attribute'
@@ -343,10 +351,10 @@ class KeeCmd(Cmd):
         if not p or not a[0]:
             print(None)
             return
-        self.update(lambda e: e.set_custom_property(a[0], p))
+        self.ui.update(lambda e: e.set_custom_property(a[0], p))
 
     def complete_agena(self, text, line, begin, end):
-        return attr_labels(self.entry, text)
+        return attr_labels(self.ui.entry(), text)
 
     def do_agenc(self, arg):
         'agenc LABEL SIZE # generate new crockford attribute'
@@ -355,10 +363,10 @@ class KeeCmd(Cmd):
         if not p or not a[0]:
             print(None)
             return
-        self.update(lambda e: e.set_custom_property(a[0], p))
+        self.ui.update(lambda e: e.set_custom_property(a[0], p))
 
     def complete_agenc(self, text, line, begin, end):
-        return attr_labels(self.entry, text)
+        return attr_labels(self.ui.entry(), text)
 
     def do_agend(self, arg):
         'agend LABEL SIZE # generate new digit attribute'
@@ -367,10 +375,10 @@ class KeeCmd(Cmd):
         if not p or not a[0]:
             print(None)
             return
-        self.update(lambda e: e.set_custom_property(a[0], p))
+        self.ui.update(lambda e: e.set_custom_property(a[0], p))
 
     def complete_agend(self, text, line, begin, end):
-        return attr_labels(self.entry, text)
+        return attr_labels(self.ui.entry(), text)
 
     def do_pgen(self, arg):
         'pgen SIZE # generate new printable password'
@@ -378,7 +386,7 @@ class KeeCmd(Cmd):
         if p is None:
             print(None)
             return
-        self.update(lambda e: setattr(e, 'password', p))
+        self.ui.update(lambda e: setattr(e, 'password', p))
 
     def do_pgena(self, arg):
         'pgena SIZE # generate new alphanumeric password'
@@ -386,7 +394,7 @@ class KeeCmd(Cmd):
         if p is None:
             print(None)
             return
-        self.update(lambda e: setattr(e, 'password', p))
+        self.ui.update(lambda e: setattr(e, 'password', p))
 
     def do_pgenc(self, arg):
         'pgenc SIZE # generate new crockford password'
@@ -394,7 +402,7 @@ class KeeCmd(Cmd):
         if p is None:
             print(None)
             return
-        self.update(lambda e: setattr(e, 'password', p))
+        self.ui.update(lambda e: setattr(e, 'password', p))
 
     def do_pgend(self, arg):
         'pgend SIZE # generate new digit password'
@@ -402,40 +410,41 @@ class KeeCmd(Cmd):
         if p is None:
             print(None)
             return
-        self.update(lambda e: setattr(e, 'password', p))
+        self.ui.update(lambda e: setattr(e, 'password', p))
 
-    def do_sshgen(self, arg):
+    def do_sshgen(self, _arg=None):
         'sshgen # generate ssh keys'
         key, pub = ssh_gen()
-        self.update(lambda e: setattr(e, 'username', pub), save=False)
-        self.update(lambda e: setattr(e, 'password', key))
+        self.ui.update(lambda e: setattr(e, 'username', pub), save=False)
+        self.ui.update(lambda e: setattr(e, 'password', key))
 
     def do_rm(self, arg):
         'rm ENTRY... # move entries to recycle bin'
-        for e in entries(self.kp, arg.split(), required=False):
-            self.kp.trash_entry(e)
-        self.save()
+        for e in self.ui.entries(arg.split(), required=False):
+            self.ui.trash_entry(e)
+        self.ui.save()
 
     def complete_rm(self, text, line, begin, end):
-        return titles(self.kp, text)
+        return self.ui.titles(text)
 
     def do_restore(self, arg):
         'restore [ENTRY]... # restore entries from recycle bin'
-        e = entries(self.kp, arg.split(), required=False)
+        e = self.ui.entries(arg.split(), required=False)
         if e:
-            self.kp.move_entry(e, self.kp.root_group)
-            self.save()
+            self.ui.restore_entry(e)
+            self.ui.save()
         else:
-            print('\n'.join(sorted(titles(self.kp, recycled=True))))
+            print('\n'.join(sorted(self.ui.titles(recycled=True))))
 
     def complete_restore(self, text, line, begin, end):
-        return titles(self.kp, text, recycled=True)
+        return self.ui.titles(text, recycled=True)
 
     def do_cp(self, arg):
         'cp FILE ENTRY... # copy entries to db file'
         a = arg.split() or ['']
-        e = entries(self.kp, a[1:])
-        export(a[0], e)
+        e = self.ui.entries(a[1:])
+        if export(a[0], e):
+            pass
 
     def complete_cp(self, text, line, begin, end):
         args = line.split()
@@ -445,48 +454,36 @@ class KeeCmd(Cmd):
             p, n = path.split(path.expanduser(args[1]))
             return [f for f in listdir(p or '.') if f.startswith(n)]
         else:
-            return titles(self.kp, text)
+            return self.ui.titles(text)
 
     def do_mv(self, arg):
         'mv FILE ENTRY... # copy entries to db file, then move to recycle bin'
         args = arg.split() or ['']
-        e = entries(self.kp, args[1:])
+        e = self.ui.entries(args[1:])
         if export(args[0], e):
             for entry in e:
-                self.kp.trash_entry(entry)
-            self.save()
+                self.ui.trash_entry(entry)
+            self.ui.save()
 
     def complete_mv(self, text, line, begin, end):
         return self.complete_cp(text, line, begin, end)
 
-    def do_dedup(self, arg):
+    def do_dedup(self, _arg=None):
         'dedup # number duplicate titles'
-        c = Counter(x.title for x in self.kp.entries)
+        c = Counter(x.title for x in self.ui.entries())
         d = [t for t, x in c.items() if x > 1]
         for t in d:
-            dedup(self.kp, t)
-        self.save()
+            self.ui.dedup(t)
+        self.ui.save()
 
-    def do_passwd(self, arg):
+    def do_passwd(self, _arg=None):
         'passwd # change db password'
         p = getpass()
         if p != getpass():
             print(None)
             return
-        self.kp.password = p
-        self.save()
-
-    def update(self, f, save=True):
-        update(self.entry, f)
-        if save:
-            self.save()
-
-    def save(self):
-        if self.mtime < stat(self.kp.filename).st_mtime:
-            raise FileExistsError()
-        self.kp.save()
-        self.mtime = stat(self.kp.filename).st_mtime
-
+        self.ui.set_password(p)
+        self.ui.save()
 
 def prompt(entry=None):
     p = '\n> '
@@ -593,25 +590,6 @@ def attr(entry, label):
     return entry.custom_properties[label] if entry and label in entry.custom_properties else None
 
 
-def entries(kp, titles, required=True):
-    res = [e for e in kp.entries if e.title in titles]
-    return res if not required or len(titles) == len(res) else None
-
-
-def titles(kp, prefix='', recycled=False):
-    return [
-        x.title for x in kp.entries
-        if x.title.startswith(prefix) and recycled == in_recycle_bin(kp, x)
-    ]
-
-
-def titles_by_mtime(kp, recycled=False):
-    return sorted([
-        (to_time_str(x.mtime), x.title) for x in kp.entries
-        if recycled == in_recycle_bin(kp, x)
-    ])
-
-
 def update(entry, f):
     if not entry or entry.is_a_history_entry:
         print(None)
@@ -634,7 +612,7 @@ def dedup(kp, title):
 def number(kp, title):
     for i in range(len(kp.entries)):
         t = title + str(i)
-        if not kp.find_entries(title=t, first=True):
+        if not kp.find_entries(title=t):
             return t
     return None
 
@@ -671,11 +649,10 @@ def export(filename, entries):
     return True
 
 
-def in_recycle_bin(kp, entry):
-    b = kp.recyclebin_group
-    if not b:
+def within_group(entry, group):
+    if not group:
         return False
-    uid = b.uuid
+    uid = group.uuid
     g = entry.group
     while g and not g.is_root_group:
         if g.uuid == uid:
@@ -747,6 +724,7 @@ ssh_gen_cmd = 'sshgen'
 ssh_known_cmd = 'sshknown'
 ssh_re = re.compile(r'(-*BEGIN[^\n]*.*\n-*END[^\n]*\n)([^\n]*)', re.DOTALL)
 clip_seconds = 10
+lock_seconds = 15*60
 
 
 def stdin(cmd, s):
@@ -802,13 +780,113 @@ def otp_secret(uri):
         return ''
 
 
+class KpUi:
+    def __init__(self, kp):
+        self._kp = kp
+        self._entry = None
+        self._active = time.monotonic()
+        self._mtime = stat(kp.filename).st_mtime
+
+    def locked(self):
+        return time.monotonic() - self._active > lock_seconds
+
+    def reset_timeout(self):
+        if self.locked():
+            return
+        self._active = time.monotonic()
+
+    def set_entry(self, entry):
+        if self.locked():
+            return
+        self._entry = entry 
+
+    def entry(self):
+        if self.locked():
+            return None
+        return self._entry
+
+    def update(self, f, save=True):
+        if self.locked():
+            return
+        update(self._entry, f)
+        if save:
+            self.save()
+
+    def save(self):
+        if self.locked():
+            return
+        if self._mtime < stat(self._kp.filename).st_mtime:
+            raise FileExistsError()
+        self._kp.save()
+        self._mtime = stat(self._kp.filename).st_mtime
+
+    def add_entry(self, title):
+        if self.locked():
+            return None
+        entry = pykeepass.entry.Entry(title, '', '', kp=self._kp)
+        self._kp.root_group.append(entry)
+        return entry
+
+    def trash_entry(self, entry):
+        if self.locked():
+            return
+        self._kp.trash_entry(entry)
+
+    def restore_entry(self, entry):
+        if self.locked():
+            return
+        self._kp.move_entry(entry, self._kp.root_group)
+
+    def set_password(self, password):
+        if self.locked():
+            return
+        self._kp.password = password
+
+    def find_entry(self, title):
+        if self.locked():
+            return None
+        return self._kp.find_entries(title=title, first=True)
+
+    def entries(self, titles=None, required=True):
+        if self.locked():
+            return []
+        if not titles:
+            return self._kp.entries
+        res = [e for e in self._kp.entries if e.title in titles]
+        return res if not required or len(titles) == len(res) else None
+
+    def titles(self, prefix='', recycled=False):
+        if self.locked():
+            return []
+        return [
+            x.title for x in self._kp.entries
+            if x.title.startswith(prefix) and recycled == self.in_recycle_bin(x)
+        ]
+
+    def titles_by_mtime(self, recycled=False):
+        if self.locked():
+            return []
+        return sorted([
+            (to_time_str(x.mtime), x.title) for x in self._kp.entries
+            if recycled == self.in_recycle_bin(x)
+        ])
+
+    def in_recycle_bin(self, entry):
+        if self.locked():
+            return False
+        return within_group(entry, self._kp.recyclebin_group)
+
+    def dedup(self, title):
+        dedup(self._kp, title)
+
+
 def main(db):
     kp = open(db)
     if not kp:
         return
     while True:
         try:
-            KeeCmd(kp).cmdloop()
+            KpCmd(kp).cmdloop()
             break
         except (KeyboardInterrupt, FileExistsError) as e:
             print(type(e).__name__)
@@ -821,6 +899,7 @@ if __name__ == '__main__':
     args = ArgumentParser()
     args.add_argument('--clip')
     args.add_argument('--clip-seconds',  type=int)
+    args.add_argument('--lock-seconds',  type=int)
     args.add_argument('--paste')
     args.add_argument('--pipe')
     args.add_argument('--ssh-add')
@@ -830,6 +909,7 @@ if __name__ == '__main__':
     o = args.parse_args()
     clip_cmd = o.clip or clip_cmd
     clip_seconds = o.clip_seconds or clip_seconds
+    lock_seconds = o.lock_seconds or lock_seconds
     paste_cmd = o.paste or paste_cmd
     pipe_cmd = o.pipe or pipe_cmd
     ssh_add_fmt = o.ssh_add or ssh_add_fmt

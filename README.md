@@ -26,9 +26,7 @@
 - Database files can be protected only by a password
 - New entries can be created only in the root group
 - Entry titles with spaces are not supported in commands with multiple parameters (but can be changed using `rename`)
-- Auto-closing not available
 - No GPG integration (e.g. by [forwarding gpg-agent](https://wiki.gnupg.org/AgentForwarding))
-- Only tested manually
 - Not published to [PyPI](https://pypi.org/) yet
 
 ## Install
