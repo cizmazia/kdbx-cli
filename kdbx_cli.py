@@ -244,13 +244,13 @@ class KpCmd(Cmd):
 
     def do_otpput(self, _arg=None):
         'otpput # change TOTP secret'
-        self.ui.update(lambda e: setattr(e, 'otp', pyotp.TOTP(getpass(prompt='TOTP secret: ')).provisioning_uri()))
+        self.ui.update(lambda e: setattr(e, 'otp', otp_uri(getpass(prompt='TOTP secret: '))))
 
     def do_otppaste(self, _arg=None):
         'otppaste # paste new TOTP secret'
         s = paste()
         if s:
-            self.ui.update(lambda e: setattr(e, 'otp', pyotp.TOTP(s).provisioning_uri()))
+            self.ui.update(lambda e: setattr(e, 'otp', otp_uri(s)))
 
     def do_uput(self, _arg=None):
         'uput # change username'
@@ -764,6 +764,11 @@ def sample(s):
 def ssh_gen():
     r = stdout(ssh_gen_cmd)
     return ssh_re.match(r).group(1, 2) if r else (None, None)
+
+
+def otp_uri(secret):
+    s = secret.replace(' ', '')
+    return pyotp.TOTP(s).provisioning_uri()
 
 
 def otp_code(uri):

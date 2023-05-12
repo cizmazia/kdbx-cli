@@ -180,6 +180,29 @@ class test_kdbx_cli(unittest.TestCase):
         e = self.open_kp().find_entries(title=title, first=True)
         self.assertEqual(e.password, pw)
 
+    @patch('kdbx_cli.subprocess.run')
+    def test_do_otppaste(self, mock_run):
+        title = 'test_do_otppaste'
+        mock_run.return_value.returncode = 0
+        mock_run.return_value.stdout = f'{title} otp sec'.encode()
+        cmd = KpCmd(self.kp)
+        cmd.do_add(title)
+        mock_run.mock_calls = []
+        cmd.do_otppaste()
+        self.assertEqual(mock_run.mock_calls, [call(mock_paste, stdout=-1)])
+        e = self.open_kp().find_entries(title=title, first=True)
+        self.assertIn(f'{title}otpsec', e.otp)
+
+    @patch('kdbx_cli.getpass')
+    def test_do_otpput(self, mock_getpass):
+        title = 'test_do_otpput'
+        mock_getpass.return_value = f'{title} otp sec'
+        cmd = KpCmd(self.kp)
+        cmd.do_add(title)
+        cmd.do_otpput()
+        e = self.open_kp().find_entries(title=title, first=True)
+        self.assertIn(f'{title}otpsec', e.otp)
+
     @patch('builtins.print')
     def test_do_ud(self, mock_print):
         pw = 'test_do_ud pw'
