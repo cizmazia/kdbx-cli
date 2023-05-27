@@ -8,6 +8,7 @@ import tempfile
 import os
 import re
 from time import sleep
+from importlib.metadata import version
 
 __import__('sys').modules['unittest.util']._MAX_LENGTH = 999999999
 mock_pw = 'mock pw'
@@ -21,6 +22,8 @@ kdbx_cli.clip_seconds = 1
 class test_kdbx_cli(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        print('pykeepass ' + version('pykeepass'))
+        print('pyotp ' + version('pyotp'))
         cls.tmp = tempfile.mkdtemp()
         cls.db = os.path.join(cls.tmp, 'test.kdbx')
         cls.kp = pykeepass.create_database(cls.db, password=mock_pw)
