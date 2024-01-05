@@ -672,24 +672,31 @@ def to_time_str(d):
     return d.astimezone().strftime('%Y.%m.%d_%H.%M.%S')
 
 
+# 54+28 = 82 characters
 # https://owasp.org/www-community/password-special-characters
 def owasp(b):
-    return alnum(b) or chr(b) in ('!"#$%&()*+,-./:<=>?@[]^_{|}' + "'" + "\\")
+    return alnum(b) or chr(b) in ('!#$%&()*+,-./:<=>?@[]^_{|}' + "'" + "\\")
 
 
+# 32+32-10 = 54 characters
 def alnum(b):
     c = chr(b)
-    return ('0' <= c and c <= '9') or ('A' <= c and c <= 'Z') or ('a' <= c and c <= 'z')
+    return (('0' <= c and c <= '9')
+        or ('A' <= c and c <= 'Z' and c not in 'ILOU')
+        or ('a' <= c and c <= 'z' and c not in 'ilou'))
 
 
+# 10 characters
 def decimal(b):
     c = chr(b)
     return ('0' <= c and c <= '9')
 
 
+# 10+26-4 = 32 characters excluding I, L, O, U.
 # https://github.com/jbittel/base32-crockford
 def crockford(b):
-    return chr(b) in '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
+    c = chr(b)
+    return ('0' <= c and c <= '9') or ('A' <= c and c <= 'Z' and c not in 'ILOU')
 
 
 def filter_urandom(size, cond, block_size=512):
