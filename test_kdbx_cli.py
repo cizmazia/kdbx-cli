@@ -50,6 +50,34 @@ class test_kdbx_cli(unittest.TestCase):
         e = self.open_kp().find_entries(title=title, first=True)
         self.assertEqual(e.title, title)
 
+    def test_do_rm(self):
+        cmd = KpCmd(self.kp)
+        title = 'test_do_rm'
+        e = cmd.ui.add_entry(title)
+        self.assertFalse(cmd.ui.in_recycle_bin(e))
+        cmd.do_rm(title)
+        self.assertTrue(cmd.ui.in_recycle_bin(e))
+
+    @patch('builtins.print')
+    def test_dont_rm(self, mock_print):
+        cmd = KpCmd(self.kp)
+        title = 'test_dont_rm'
+        e = cmd.ui.add_entry(title)
+        self.assertFalse(cmd.ui.in_recycle_bin(e))
+        cmd.do_rm('')
+        self.assertFalse(cmd.ui.in_recycle_bin(e))
+        self.assertEqual(mock_print.mock_calls, [call(None)])
+
+    @patch('builtins.print')
+    def test_dont_rm_wrong(self, mock_print):
+        cmd = KpCmd(self.kp)
+        title = 'test_dont_rm_wrong'
+        e = cmd.ui.add_entry(title)
+        self.assertFalse(cmd.ui.in_recycle_bin(e))
+        cmd.do_rm(f'{title} wrong')
+        self.assertFalse(cmd.ui.in_recycle_bin(e))
+        self.assertEqual(mock_print.mock_calls, [call(None)])
+
     def test_do_restore(self):
         cmd = KpCmd(self.kp)
         title = 'test_do_restore'
@@ -58,6 +86,17 @@ class test_kdbx_cli(unittest.TestCase):
         self.assertTrue(cmd.ui.in_recycle_bin(e))
         cmd.do_restore(title)
         self.assertFalse(cmd.ui.in_recycle_bin(e))
+
+    @patch('builtins.print')
+    def test_dont_restore_but_list(self, mock_print):
+        cmd = KpCmd(self.kp)
+        title = 'test_dont_restore_but_list'
+        e = cmd.ui.add_entry(title)
+        cmd.ui.trash_entry(e)
+        self.assertTrue(cmd.ui.in_recycle_bin(e))
+        cmd.do_restore('')
+        self.assertTrue(cmd.ui.in_recycle_bin(e))
+        self.assertIn(title, mock_print.call_args.args[0])
 
     def test_do_dedup(self):
         cmd = KpCmd(self.kp)

@@ -420,7 +420,11 @@ class KpCmd(Cmd):
 
     def do_rm(self, arg):
         'rm ENTRY... # move entries to recycle bin'
-        for e in self.ui.entries(arg.split(), required=False):
+        entries = self.ui.find_entries(arg.split())
+        if not entries:
+            print(None)
+            return
+        for e in entries:
             self.ui.trash_entry(e)
         self.ui.save()
 
@@ -429,9 +433,9 @@ class KpCmd(Cmd):
 
     def do_restore(self, arg):
         'restore [ENTRY]... # restore entries from recycle bin'
-        e = self.ui.entries(arg.split(), required=False)
-        if e:
-            self.ui.restore_entry(e)
+        entries = self.ui.find_entries(arg.split())
+        if entries:
+            self.ui.restore_entry(entries)
             self.ui.save()
         else:
             print('\n'.join(sorted(self.ui.titles(recycled=True))))
@@ -442,8 +446,8 @@ class KpCmd(Cmd):
     def do_cp(self, arg):
         'cp FILE ENTRY... # copy entries to db file'
         a = arg.split() or ['']
-        e = self.ui.entries(a[1:])
-        if export(a[0], e):
+        entries = self.ui.find_entries(a[1:])
+        if export(a[0], entries):
             pass
 
     def complete_cp(self, text, line, begin, end):
@@ -459,9 +463,9 @@ class KpCmd(Cmd):
     def do_mv(self, arg):
         'mv FILE ENTRY... # copy entries to db file, then move to recycle bin'
         args = arg.split() or ['']
-        e = self.ui.entries(args[1:])
-        if export(args[0], e):
-            for entry in e:
+        entries = self.ui.find_entries(args[1:])
+        if export(args[0], entries):
+            for entry in entries:
                 self.ui.trash_entry(entry)
             self.ui.save()
 
@@ -859,13 +863,18 @@ class KpUi:
             return None
         return self._kp.find_entries(title=title, first=True)
 
-    def entries(self, titles=None, required=True):
+    def find_entries(self, titles):
         if self.locked():
             return []
         if not titles:
-            return self._kp.entries
+            return []
         res = [e for e in self._kp.entries if e.title in titles]
-        return res if not required or len(titles) == len(res) else None
+        return res if len(titles) == len(res) else []
+
+    def entries(self):
+        if self.locked():
+            return []
+        return self._kp.entries
 
     def titles(self, prefix='', recycled=False):
         if self.locked():
