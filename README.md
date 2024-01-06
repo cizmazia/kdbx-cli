@@ -141,6 +141,6 @@ Generate Entry Passwords
 
 ## Alternatives
 
-* [keepassxc-cli](https://keepassxc.org/project/)
+* [keepassxc-cli](https://github.com/keepassxreboot/keepassxc/blob/develop/docs/man/keepassxc-cli.1.adoc)
 * [passhole](https://github.com/Evidlo/passhole)
 
