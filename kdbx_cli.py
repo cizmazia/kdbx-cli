@@ -6,7 +6,7 @@ from argparse import ArgumentParser
 from cmd import Cmd
 from collections import Counter
 from os import path, listdir, urandom, stat
-from datetime import datetime
+from datetime import datetime, timezone
 import subprocess
 from threading import Timer
 from copy import deepcopy
@@ -600,7 +600,7 @@ def update(entry, f):
         return
     entry.save_history()
     f(entry)
-    entry.mtime = datetime.now()
+    entry.mtime = datetime.now(timezone.utc)
 
 
 def dedup(kp, title):

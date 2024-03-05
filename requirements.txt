@@ -1,2 +1,2 @@
-pykeepass==4.0.6
+pykeepass==4.0.7
 pyotp==2.9.0
