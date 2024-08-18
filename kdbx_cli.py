@@ -769,7 +769,7 @@ def pipe(s):
 
 
 def sample(s):
-    print(re.sub(r'^(.{4}).*(.{4})$', '\g<1>***\g<2>', s))
+    print(re.sub(r'^(.{4}).*(.{4})$', r'\g<1>***\g<2>', s))
 
 
 def ssh_gen():
