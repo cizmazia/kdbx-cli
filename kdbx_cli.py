@@ -714,12 +714,12 @@ def filter_urandom(size, cond, block_size=512):
     return bytes(res[:size]).decode()
 
 
-def open(filename):
+def open(filename, key_filename):
     try:
         db = path.expanduser(filename)
         if not path.exists(db):
-            return pykeepass.create_database(db, password=getpass())
-        return pykeepass.PyKeePass(db, password=getpass())
+            return pykeepass.create_database(db, password=getpass(), keyfile=key_filename)
+        return pykeepass.PyKeePass(db, password=getpass(), keyfile=key_filename)
     except FileNotFoundError:
         print('wrong dir')
     except pykeepass.exceptions.CredentialsError:
@@ -901,8 +901,8 @@ class KpUi:
         dedup(self._kp, title)
 
 
-def main(db):
-    kp = open(db)
+def main(db, key):
+    kp = open(db, key)
     if not kp:
         return
     while True:
@@ -920,6 +920,7 @@ if __name__ == '__main__':
     args = ArgumentParser()
     args.add_argument('--clip')
     args.add_argument('--clip-seconds',  type=int)
+    args.add_argument('--key')
     args.add_argument('--lock-seconds',  type=int)
     args.add_argument('--paste')
     args.add_argument('--pipe')
@@ -936,4 +937,4 @@ if __name__ == '__main__':
     ssh_add_fmt = o.ssh_add or ssh_add_fmt
     ssh_gen_cmd = o.ssh_gen or ssh_gen_cmd
     ssh_known_cmd = o.ssh_known or ssh_known_cmd
-    main(o.db)
+    main(o.db, o.key)
