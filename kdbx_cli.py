@@ -447,7 +447,7 @@ class KpCmd(Cmd):
         'cp FILE ENTRY... # copy entries to db file'
         a = arg.split() or ['']
         entries = self.ui.find_entries(a[1:])
-        if export(a[0], entries):
+        if export(a[0], None, entries):
             pass
 
     def complete_cp(self, text, line, begin, end):
@@ -464,7 +464,7 @@ class KpCmd(Cmd):
         'mv FILE ENTRY... # copy entries to db file, then move to recycle bin'
         args = arg.split() or ['']
         entries = self.ui.find_entries(args[1:])
-        if export(args[0], entries):
+        if export(args[0], None, entries):
             for entry in entries:
                 self.ui.trash_entry(entry)
             self.ui.save()
@@ -639,11 +639,11 @@ def clone(kp, entry, history=True):
     return entry
 
 
-def export(filename, entries):
+def export(filename, key_filename, entries):
     if not entries:
         print(None)
         return False
-    kp = open(filename)
+    kp = open(filename, key_filename)
     if not kp:
         return False
     kp.root_group.append([clone(kp, e, history=False) for e in entries])
@@ -714,12 +714,12 @@ def filter_urandom(size, cond, block_size=512):
     return bytes(res[:size]).decode()
 
 
-def open(filename):
+def open(filename, key_filename):
     try:
         db = path.expanduser(filename)
         if not path.exists(db):
-            return pykeepass.create_database(db, password=getpass())
-        return pykeepass.PyKeePass(db, password=getpass())
+            return pykeepass.create_database(db, password=getpass(), keyfile=key_filename)
+        return pykeepass.PyKeePass(db, password=getpass(), keyfile=key_filename)
     except FileNotFoundError:
         print('wrong dir')
     except pykeepass.exceptions.CredentialsError:
@@ -901,8 +901,8 @@ class KpUi:
         dedup(self._kp, title)
 
 
-def main(db):
-    kp = open(db)
+def main(db, key):
+    kp = open(db, key)
     if not kp:
         return
     while True:
@@ -920,6 +920,7 @@ if __name__ == '__main__':
     args = ArgumentParser()
     args.add_argument('--clip')
     args.add_argument('--clip-seconds',  type=int)
+    args.add_argument('--key')
     args.add_argument('--lock-seconds',  type=int)
     args.add_argument('--paste')
     args.add_argument('--pipe')
@@ -936,4 +937,4 @@ if __name__ == '__main__':
     ssh_add_fmt = o.ssh_add or ssh_add_fmt
     ssh_gen_cmd = o.ssh_gen or ssh_gen_cmd
     ssh_known_cmd = o.ssh_known or ssh_known_cmd
-    main(o.db)
+    main(o.db, o.key)
