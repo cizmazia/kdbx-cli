@@ -495,15 +495,15 @@ def prompt(entry=None):
         return p
     t = entry.title
     if entry.is_a_history_entry:
-        t = parent_entry(entry).title + ' ' + to_time_str(entry.mtime)
-    p = '\n\033[34m' + t + '\033[0m' + p
+        t = '{} {}'.format(parent_entry(entry).title, to_time_str(entry.mtime))
+    p = '\n\033[34m{}\033[0m{}'.format(t, p)
     return p
 
 
 def contains(e, arg):
     s = arg.lower()
     return (
-        s in e.title.lower()
+        (e.title and s in e.title.lower())
         or s in (e.url or '').lower()
         or s in (e.username or '').lower()
         or s in ' '.join(note_labels(e)).lower()
@@ -881,7 +881,7 @@ class KpUi:
             return []
         return [
             x.title for x in self._kp.entries
-            if x.title.startswith(prefix) and recycled == self.in_recycle_bin(x)
+            if x.title and x.title.startswith(prefix) and recycled == self.in_recycle_bin(x)
         ]
 
     def titles_by_mtime(self, recycled=False):
