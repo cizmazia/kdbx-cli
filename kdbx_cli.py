@@ -447,7 +447,7 @@ class KpCmd(Cmd):
         'cp FILE ENTRY... # copy entries to db file'
         a = arg.split() or ['']
         entries = self.ui.find_entries(a[1:])
-        if export(a[0], entries):
+        if export(a[0], None, entries):
             pass
 
     def complete_cp(self, text, line, begin, end):
@@ -464,7 +464,7 @@ class KpCmd(Cmd):
         'mv FILE ENTRY... # copy entries to db file, then move to recycle bin'
         args = arg.split() or ['']
         entries = self.ui.find_entries(args[1:])
-        if export(args[0], entries):
+        if export(args[0], None, entries):
             for entry in entries:
                 self.ui.trash_entry(entry)
             self.ui.save()
@@ -639,11 +639,11 @@ def clone(kp, entry, history=True):
     return entry
 
 
-def export(filename, entries):
+def export(filename, key_filename, entries):
     if not entries:
         print(None)
         return False
-    kp = open(filename)
+    kp = open(filename, key_filename)
     if not kp:
         return False
     kp.root_group.append([clone(kp, e, history=False) for e in entries])
